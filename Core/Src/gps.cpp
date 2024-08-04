@@ -184,30 +184,30 @@ int GPS::validate(const uint8_t *nmea)
 
 void GPS::parse(const uint8_t *nmea)
 {
-	char *c = (char *)nmea;
+	char *c = (char *)nmea + 3;
 
-	if (!strncmp(c, "$GPGGA", 6))
+	if (!strncmp(c, "GGA", 3))
 	{
-		if (sscanf(c, "$GPGGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,%c", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &lock, &satelites, &hdop, &msl_altitude, &msl_units) >= 1)
+		if (sscanf(c, "GGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,%c", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &lock, &satelites, &hdop, &msl_altitude, &msl_units) >= 1)
 		{
 			latitude = nmea_to_dec(nmea_latitude, ns);
 			longitude = nmea_to_dec(nmea_longitude, ew);
 			return;
 		}
 	}
-	else if (!strncmp(c, "$GPRMC", 6))
+	else if (!strncmp(c, "RMC", 3))
 	{
-		if (sscanf(c, "$GPRMC,%f,%f,%c,%f,%c,%f,%f,%d", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &speed_k, &course_d, &date) >= 1)
+		if (sscanf(c, "RMC,%f,%f,%c,%f,%c,%f,%f,%d", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &speed_k, &course_d, &date) >= 1)
 			return;
 	}
-	else if (!strncmp(c, "$GPGLL", 6))
+	else if (!strncmp(c, "GLL", 3))
 	{
-		if (sscanf(c, "$GPGLL,%f,%c,%f,%c,%f,%c", &nmea_latitude, &ns, &nmea_longitude, &ew, &utc_time, &gll_status) >= 1)
+		if (sscanf(c, "GLL,%f,%c,%f,%c,%f,%c", &nmea_latitude, &ns, &nmea_longitude, &ew, &utc_time, &gll_status) >= 1)
 			return;
 	}
-	else if (!strncmp(c, "$GPVTG", 6))
+	else if (!strncmp(c, "VTG", 3))
 	{
-		if (sscanf(c, "$GPVTG,%f,%c,%f,%c,%f,%c,%f,%c", &course_t, &course_t_unit, &course_m, &course_m_unit, &speed_k, &speed_k_unit, &speed_km, &speed_km_unit) >= 1)
+		if (sscanf(c, "VTG,%f,%c,%f,%c,%f,%c,%f,%c", &course_t, &course_t_unit, &course_m, &course_m_unit, &speed_k, &speed_k_unit, &speed_km, &speed_km_unit) >= 1)
 			return;
 	}
 

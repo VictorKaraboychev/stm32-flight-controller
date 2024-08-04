@@ -99,7 +99,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t statusLedTaskHandle;
 const osThreadAttr_t statusLedTask_attributes = {
 	.name = "statusLedTask",
-	.stack_size = 128 * 4,
+	.stack_size = 1024 * 4,
 	.priority = (osPriority_t)osPriorityLow,
 };
 /* Definitions for spi1Mutex */
@@ -205,7 +205,6 @@ void MX_FREERTOS_Init(void)
 void StartDefaultTask(void *argument)
 {
 	/* init code for USB_DEVICE */
-	MX_USB_DEVICE_Init();
 	/* USER CODE BEGIN StartDefaultTask */
 	/* Infinite loop */
 
