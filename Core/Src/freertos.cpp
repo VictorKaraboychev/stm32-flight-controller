@@ -305,21 +305,19 @@ void StartDefaultTask(void *argument)
 void StartStatusLedTask(void *argument)
 {
 	/* USER CODE BEGIN StartStatusLedTask */
-	// gps.init(&huart4);
+	gps.init(&huart4);
 
-	// gps.setBaudRate(GPS_BAUDRATE_115200);
-	// gps.setOutputRate(GPS_ODR_1HZ);
+	gps.setBaudRate(GPS_BAUDRATE_115200);
+	gps.setOutputRate(GPS_ODR_10HZ);
+
+	gps.start();
 
 	/* Infinite loop */
 	while (1)
 	{
 		HAL_GPIO_TogglePin(LED1_STATUS1_PE0_GPIO_Port, LED1_STATUS1_PE0_Pin);
 
-		printf("Hello World\n");
-
-		// gps.update();
-
-		// printf("Latitude: %f Longitude: %f Altitude: %f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
+		printf("Latitude: %f Longitude: %f Altitude: %f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
 
 		osDelay(500);
 	}

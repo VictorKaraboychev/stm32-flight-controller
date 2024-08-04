@@ -33,45 +33,39 @@ GPS::~GPS()
 void GPS::init(UART_HandleTypeDef *huart)
 {
 	this->huart = huart;
-
-	// char cmdbuf[] = "$PCAS02,1000*2E\r\n";	/* NMEA command, write(fd, cmdbuf, strlen(cmdbuf)); */
-
-	// HAL_UART_Transmit(this->huart, (uint8_t *)cmdbuf, sizeof(cmdbuf), 100);
 }
 
-void GPS::update()
+void GPS::start()
 {
-	uint8_t rx_buffer[128] = {0};
-	uint8_t i = 0;
+	HAL_UART_Receive_IT(this->huart, &rx_byte, 1);
+}
 
-	while (i < sizeof(rx_buffer))
+void GPS::UART_Callback()
+{
+	if (rx_byte == '\n')
 	{
-		uint8_t rx_byte = 0;
-		if (HAL_UART_Receive(this->huart, &rx_byte, 1, 1000) == HAL_OK)
+		if (validate(rx_buffer))
 		{
-			rx_buffer[i++] = rx_byte;
-
-			if (rx_byte == '\n')
-			{
-				break;
-			}
+			printf("%s\n", rx_buffer);
+			parse(rx_buffer);
 		}
-		else
-		{
-			i = 0;
-		}
+		rx_index = 0;
+		memset(rx_buffer, 0, sizeof(rx_buffer));
+	}
+	else
+	{
+		rx_buffer[rx_index++] = rx_byte;
 	}
 
-	printf("%s", rx_buffer);
+	HAL_UART_Receive_IT(this->huart, &rx_byte, 1);
+}
 
-	// uint8_t checksum = nmeaChecksum(rx_buffer);
-
-	// printf("%s Checksum: %02X\n", rx_buffer, checksum);
-
-	// if (validate(rx_buffer))
-	// {
-	// 	parse(rx_buffer);
-	// }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == gps.huart->Instance)
+	{
+		gps.UART_Callback();
+	}
 }
 
 float GPS::getLatitude()
@@ -216,6 +210,7 @@ void GPS::parse(const uint8_t *nmea)
 		if (sscanf(c, "$GPVTG,%f,%c,%f,%c,%f,%c,%f,%c", &course_t, &course_t_unit, &course_m, &course_m_unit, &speed_k, &speed_k_unit, &speed_km, &speed_km_unit) >= 1)
 			return;
 	}
+
 }
 
 float GPS::nmea_to_dec(float deg_coord, char nsew)

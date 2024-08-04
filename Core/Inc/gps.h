@@ -38,6 +38,7 @@ public:
 	~GPS();
 
 	void init(UART_HandleTypeDef *huart);
+	void start();
 	void update();
 
 	float getLatitude();
@@ -47,7 +48,13 @@ public:
 	void setBaudRate(GPS_BAUDRATE baudrate);
 	void setOutputRate(GPS_ODR odr);
 
+	void UART_Callback();
 private:
+	// NMEA buffer
+	uint8_t rx_byte;
+	uint8_t rx_buffer[256];
+	uint8_t rx_index;
+
 	// calculated values
 	float longitude;
 	float latitude;
