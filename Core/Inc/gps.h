@@ -68,7 +68,6 @@ private:
 	int lock;
 	int satelites;
 	float hdop;
-	float msl_altitude;
 	char msl_units;
 
 	// RMC - Recommended Minimmum Specific GNS Data

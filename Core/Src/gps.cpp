@@ -46,7 +46,7 @@ void GPS::UART_Callback()
 	{
 		if (validate(rx_buffer))
 		{
-			printf("%s\n", rx_buffer);
+			// printf("%s\n", rx_buffer);
 			parse(rx_buffer);
 		}
 		rx_index = 0;
@@ -188,7 +188,7 @@ void GPS::parse(const uint8_t *nmea)
 
 	if (!strncmp(c, "GGA", 3))
 	{
-		if (sscanf(c, "GGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,%c", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &lock, &satelites, &hdop, &msl_altitude, &msl_units) >= 1)
+		if (sscanf(c, "GGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,%c", &utc_time, &nmea_latitude, &ns, &nmea_longitude, &ew, &lock, &satelites, &hdop, &altitude, &msl_units) >= 1)
 		{
 			latitude = nmea_to_dec(nmea_latitude, ns);
 			longitude = nmea_to_dec(nmea_longitude, ew);
@@ -210,7 +210,6 @@ void GPS::parse(const uint8_t *nmea)
 		if (sscanf(c, "VTG,%f,%c,%f,%c,%f,%c,%f,%c", &course_t, &course_t_unit, &course_m, &course_m_unit, &speed_k, &speed_k_unit, &speed_km, &speed_km_unit) >= 1)
 			return;
 	}
-
 }
 
 float GPS::nmea_to_dec(float deg_coord, char nsew)

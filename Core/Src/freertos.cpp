@@ -316,7 +316,7 @@ void StartStatusLedTask(void *argument)
 	{
 		HAL_GPIO_TogglePin(LED1_STATUS1_PE0_GPIO_Port, LED1_STATUS1_PE0_Pin);
 
-		printf("Latitude: %f Longitude: %f Altitude: %f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
+		printf("Latitude: %.8f Longitude: %.8f Altitude: %.2f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
 
 		osDelay(500);
 	}
