@@ -32,6 +32,7 @@
 #include "spi.h"
 #include "gps.h"
 #include "usart.h"
+#include "i2c.h"
 #include "main.h"
 
 /* USER CODE END Includes */
@@ -44,8 +45,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define READ_MASK 0x80
-#define WRITE_MASK 0x7F
+// TF-Luna I2C address
+#define TF_LUNA_ADDRESS (0x10 << 1) // Address might be 0x10, shift for STM HAL
 
 /* USER CODE END PD */
 
@@ -60,18 +61,6 @@
 LPS22HH_Object_t lps22hh;
 // LIS3MDTR_Object_t lis3mdl;
 LSM6DSO_Object_t lsm6dso;
-
-// void lps22hhInit();
-// float pressureToAltitude(float pressure);
-// float getPressure();
-// float getTemperature();
-
-// void lsm6dsoInit();
-// void getAcceleration(float *x, float *y, float *z);
-// void getGyroscope(float *x, float *y, float *z);
-
-static uint8_t Read_SPI_Register(GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, uint8_t *pData, uint16_t size);
-static uint8_t Write_SPI_Register(GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, const uint8_t *pData, uint16_t size);
 
 // HAL_StatusTypeDef Init_LPS22HH(void);
 int32_t Write_LPS22HH(void *handle, uint8_t reg, uint8_t *data, uint16_t len);
@@ -204,15 +193,13 @@ void MX_FREERTOS_Init(void)
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
-	/* init code for USB_DEVICE */
-	/* USER CODE BEGIN StartDefaultTask */
-	/* Infinite loop */
-
 	HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(BAR_CS_GPIO_Port, BAR_CS_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
+
+	// LPS22HH Sensor
 
 	lps22hh.Ctx.handle = &hspi1;
 	lps22hh.Ctx.write_reg = Write_LPS22HH;
@@ -224,6 +211,8 @@ void StartDefaultTask(void *argument)
 	LPS22HH_PRESS_SetOutputDataRate(&lps22hh, 200.0f);
 
 	LPS22HH_TEMP_Enable(&lps22hh);
+
+	// LSM6DSO Sensor
 
 	lsm6dso.Ctx.handle = &hspi1;
 	lsm6dso.Ctx.write_reg = Write_LSM6DSO;
@@ -242,23 +231,6 @@ void StartDefaultTask(void *argument)
 
 	osDelay(10);
 
-	// float avgPressure = 0.0f;
-
-	// for (int i = 0; i < 50; i++)
-	// {
-	// 	float p;
-	// 	LPS22HH_PRESS_GetPressure(&lps22hh, &p);
-	// 	avgPressure += p;
-	// 	osDelay(5);
-	// }
-
-	// avgPressure /= 50.0f;
-
-	// float referenceAltitude = pressureToAltitude(avgPressure);
-
-	// float a = 0.05f;
-	// float pressure = 0.0f;
-
 	while (1)
 	{
 		float pressure, temperature;
@@ -267,27 +239,19 @@ void StartDefaultTask(void *argument)
 
 		// printf("Pressure: %.2f, Temperature: %.2f\n", pressure, temperature);
 
-		// pressure = pressure * (1 - a) + a * getPressure();
+		LSM6DSO_AxesRaw_t acc, gyro;
 
-		// float temperature = getTemperature();
-		// float altitude = pressureToAltitude(pressure);
-
-		// printf("Pressure: %.2f Pa Temperature: %.2f C  Altitude: %.4f m \n", pressure, temperature, altitude - referenceAltitude);
-
-		// float ax, ay, az;
-		// getAcceleration(&ax, &ay, &az);
-
-		// float gx, gy, gz;
-		// getGyroscope(&gx, &gy, &gz);
-
-		// printf("Acceleration: %.2f %.2f %.2f Gyroscope: %.2f %.2f %.2f\n", ax, ay, az, gx, gy, gz);
-
-		// LSM6DSO_AxesRaw_t  acc, gyro;
-
-		// LSM6DSO_ACC_GetAxesRaw(&lsm6dso, &acc);
-		// LSM6DSO_ACC_GetAxesRaw(&lsm6dso, &gyro);
+		LSM6DSO_ACC_GetAxesRaw(&lsm6dso, &acc);
+		LSM6DSO_ACC_GetAxesRaw(&lsm6dso, &gyro);
 
 		// printf("Acceleration: %d %d %d Gyroscope: %d %d %d\n", (int)acc.x, (int)acc.y, (int)acc.z, (int)gyro.x, (int)gyro.y, (int)gyro.z);
+
+		uint8_t data[2] = {0};
+		// I2C_Read_Register(&hi2c1, TF_LUNA_ADDRESS, 0x00, data, 2);
+
+		// uint16_t distance = (data[1] << 8) | data[0];
+
+		// printf("Distance: %d\n", distance);
 
 		osDelay(5);
 	}
@@ -311,14 +275,23 @@ void StartStatusLedTask(void *argument)
 
 	gps.start();
 
-	/* Infinite loop */
 	while (1)
 	{
-		HAL_GPIO_TogglePin(LED1_STATUS1_PE0_GPIO_Port, LED1_STATUS1_PE0_Pin);
+
+		if (gps.isFixed())
+		{
+			HAL_GPIO_TogglePin(LED1_STATUS1_PE0_GPIO_Port, LED1_STATUS1_PE0_Pin);
+			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_RESET);
+		}
+		else
+		{
+			HAL_GPIO_WritePin(LED1_STATUS1_PE0_GPIO_Port, LED1_STATUS1_PE0_Pin, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_SET);
+		}
 
 		printf("Latitude: %.8f Longitude: %.8f Altitude: %.2f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
 
-		osDelay(500);
+		osDelay(100);
 	}
 	/* USER CODE END StartStatusLedTask */
 }
@@ -384,60 +357,6 @@ void StartStatusLedTask(void *argument)
 // 	return (d[1] << 8 | d[0]) / 100.0f;
 // }
 
-static uint8_t Read_SPI_Register(GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, uint8_t *pData, uint16_t size)
-{
-	uint8_t buffer[size + 1];
-
-	// The register address needs to be OR-ed with the READ_MASK to set the MSB (read command)
-	buffer[0] = regAddr | READ_MASK;
-
-	// Initiate the SPI transmission
-	HAL_GPIO_WritePin(csPort, csPin, GPIO_PIN_RESET);
-	uint8_t status = HAL_SPI_TransmitReceive(&hspi1, buffer, buffer, size + 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(csPort, csPin, GPIO_PIN_SET);
-
-	// Check if the transmission was successful
-	if (status != HAL_OK)
-	{
-		return HAL_ERROR;
-	}
-
-	// Store the received data in pData
-	for (int i = 0; i < size; i++)
-	{
-		pData[i] = buffer[i + 1]; // Skip the first byte (dummy byte)
-	}
-
-	return HAL_OK;
-}
-
-static uint8_t Write_SPI_Register(GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, const uint8_t *pData, uint16_t size)
-{
-	uint8_t buffer[size + 1];
-
-	// The register address needs to be OR-ed with the WRITE_MASK to indicate a write operation
-	buffer[0] = regAddr & WRITE_MASK;
-
-	// Copy the data to be written into the txBuffer
-	for (int i = 0; i < size; i++)
-	{
-		buffer[i + 1] = pData[i];
-	}
-
-	// Initiate the SPI transmission
-	HAL_GPIO_WritePin(csPort, csPin, GPIO_PIN_RESET);
-	uint8_t status = HAL_SPI_Transmit(&hspi1, buffer, size + 1, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(csPort, csPin, GPIO_PIN_SET);
-
-	// Check if the transmission was successful
-	if (status != HAL_OK)
-	{
-		return HAL_ERROR;
-	}
-
-	return HAL_OK;
-}
-
 // LPS22HH Functions
 
 // HAL_StatusTypeDef Init_LPS22HH(void)
@@ -469,24 +388,24 @@ static uint8_t Write_SPI_Register(GPIO_TypeDef *csPort, uint16_t csPin, uint8_t 
 
 int32_t Write_LPS22HH(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Write_SPI_Register(BAR_CS_GPIO_Port, BAR_CS_Pin, reg, data, len);
+	return SPI_Write_Register(&hspi1, BAR_CS_GPIO_Port, BAR_CS_Pin, reg, data, len);
 }
 
 int32_t Read_LPS22HH(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Read_SPI_Register(BAR_CS_GPIO_Port, BAR_CS_Pin, reg, data, len);
+	return SPI_Read_Register(&hspi1, BAR_CS_GPIO_Port, BAR_CS_Pin, reg, data, len);
 }
 
 // LIS3MDTR Functions
 
 int32_t Write_LIS3MDTR(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Write_SPI_Register(MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
+	return SPI_Write_Register(&hspi1, MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
 }
 
 int32_t Read_LIS3MDTR(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Read_SPI_Register(MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
+	return SPI_Read_Register(&hspi1, MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
 }
 
 // LSM6DSO Functions
@@ -534,12 +453,12 @@ int32_t Read_LIS3MDTR(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 
 int32_t Write_LSM6DSO(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Write_SPI_Register(IMU_CS_GPIO_Port, IMU_CS_Pin, reg, data, len);
+	return SPI_Write_Register(&hspi1, IMU_CS_GPIO_Port, IMU_CS_Pin, reg, data, len);
 }
 
 int32_t Read_LSM6DSO(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
-	return Read_SPI_Register(IMU_CS_GPIO_Port, IMU_CS_Pin, reg, data, len);
+	return SPI_Read_Register(&hspi1, IMU_CS_GPIO_Port, IMU_CS_Pin, reg, data, len);
 }
 
 /* USER CODE END Application */

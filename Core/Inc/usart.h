@@ -48,6 +48,8 @@ void MX_UART7_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
+void UART_SetBaudrate(UART_HandleTypeDef *huart, uint32_t baudrate);
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

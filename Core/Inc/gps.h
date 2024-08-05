@@ -39,11 +39,12 @@ public:
 
 	void init(UART_HandleTypeDef *huart);
 	void start();
-	void update();
 
 	float getLatitude();
 	float getLongitude();
 	float getAltitude();
+
+	bool isFixed();
 
 	void setBaudRate(GPS_BAUDRATE baudrate);
 	void setOutputRate(GPS_ODR odr);
@@ -54,6 +55,9 @@ private:
 	uint8_t rx_byte;
 	uint8_t rx_buffer[256];
 	uint8_t rx_index;
+
+	uint32_t baudrate = 0;
+	uint64_t lastUpdate;
 
 	// calculated values
 	float longitude;
@@ -88,9 +92,10 @@ private:
 	float speed_km; // speek km/hr
 	char speed_km_unit;
 
-	int validate(const uint8_t *nmea);
+	// TXT
+	char antenna_status;
+
 	void parse(const uint8_t *nmea);
-	float nmea_to_dec(float deg_coord, char nsew);
 };
 
 extern GPS gps;

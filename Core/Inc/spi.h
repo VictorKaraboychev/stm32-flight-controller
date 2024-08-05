@@ -36,11 +36,17 @@ extern SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN Private defines */
 
+#define READ_MASK 0x80
+#define WRITE_MASK 0x7F
+
 /* USER CODE END Private defines */
 
 void MX_SPI1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
+
+HAL_StatusTypeDef SPI_Read_Register(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, uint8_t *pData, uint16_t size);
+HAL_StatusTypeDef SPI_Write_Register(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, const uint8_t *pData, uint16_t size);
 
 /* USER CODE END Prototypes */
 
