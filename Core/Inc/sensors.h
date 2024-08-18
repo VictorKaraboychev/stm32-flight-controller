@@ -31,6 +31,8 @@ extern volatile float bar_altitude;
 extern volatile float gps_latitude;
 extern volatile float gps_longitude;
 extern volatile float gps_altitude;
+extern volatile Vector2 gps_velocity;
+extern volatile float gps_orientation_z;
 
 extern volatile float tof_distance;
 

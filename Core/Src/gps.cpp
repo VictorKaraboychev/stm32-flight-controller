@@ -77,10 +77,21 @@ void GPS::init(UART_HandleTypeDef *huart)
 void GPS::start()
 {
 	HAL_UART_Receive_IT(this->huart, &rx_byte, 1);
+	this->active = true;
+}
+
+void GPS::stop()
+{
+	this->active = false;
 }
 
 void GPS::UART_Callback()
 {
+	if (!this->active)
+	{
+		return;
+	}
+
 	if (rx_byte == '\n')
 	{
 		if (validate(rx_buffer))
@@ -120,6 +131,26 @@ float GPS::getLongitude()
 float GPS::getAltitude()
 {
 	return altitude;
+}
+
+Vector2 GPS::getVelocity()
+{
+	float theta = this->getOrientationZ();
+	float speed = this->speed_km / 3.6f;
+
+	return VECTOR2_ROTATION(theta) * speed;
+}
+
+float GPS::getOrientationZ()
+{
+	float theta = (M_PI / 180.0f) * -this->course_t + M_PI_2;
+
+	if (theta < 0)
+	{
+		theta += 2.0f * M_PI;
+	}
+
+	return theta;
 }
 
 bool GPS::isFixed()
@@ -207,7 +238,7 @@ void GPS::parse(const uint8_t *nmea)
 	if (!strncmp(c, "GGA", 3))
 	{
 		this->lock = 0;
-		if (sscanf(c, "GGA,%f,%f,%c,%f,%c,%d,%d,%f,%f,%c", &this->utc_time, &this->nmea_latitude, &this->ns, &this->nmea_longitude, &this->ew, &this->lock, &this->satelites, &this->hdop, &this->altitude, &this->msl_units) >= 1)
+		if (sscanf(c, "GGA,%f,%f,%c,%f,%c,%d,%d,%f,%f", &this->utc_time, &this->nmea_latitude, &this->ns, &this->nmea_longitude, &this->ew, &this->lock, &this->satelites, &this->hdop, &this->altitude) >= 1)
 		{
 			latitude = nmeaToDec(nmea_latitude, ns);
 			longitude = nmeaToDec(nmea_longitude, ew);
@@ -216,7 +247,7 @@ void GPS::parse(const uint8_t *nmea)
 	}
 	else if (!strncmp(c, "RMC", 3))
 	{
-		if (sscanf(c, "RMC,%f,%f,%c,%f,%c,%f,%f,%d", &this->utc_time, &this->nmea_latitude, &this->ns, &this->nmea_longitude, &this->ew, &this->speed_k, &this->course_d, &this->date) >= 1)
+		if (sscanf(c, "RMC,%f,%f,%c,%f,%c,%f,%f,%d", &this->utc_time, &this->nmea_latitude, &this->ns, &this->nmea_longitude, &this->ew, &this->speed_nmi, &this->course_d, &this->date) >= 1)
 			return;
 	}
 	else if (!strncmp(c, "GLL", 3))
@@ -226,7 +257,7 @@ void GPS::parse(const uint8_t *nmea)
 	}
 	else if (!strncmp(c, "VTG", 3))
 	{
-		if (sscanf(c, "VTG,%f,%c,%f,%c,%f,%c,%f,%c", &this->course_t, &this->course_t_unit, &this->course_m, &this->course_m_unit, &this->speed_k, &this->speed_k_unit, &this->speed_km, &this->speed_km_unit) >= 1)
+		if (sscanf(c, "VTG,%f,T,,M,%f,N,%f,K", &this->course_t, &this->speed_nmi, &this->speed_km) >= 1)
 			return;
 	}
 	else if (!strncmp(c, "TXT", 3))

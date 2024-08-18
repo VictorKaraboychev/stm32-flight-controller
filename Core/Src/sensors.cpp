@@ -26,7 +26,6 @@ void ComputeStatisticsRecursive(statistics_t *stats, uint32_t period_ms, float v
 	printf("Mean: %.3f, Variance: %.5f, STD (95%%): %.5f, Samples: %d\n", stats->mean, stats->variance, 2.0f * sqrt(stats->variance), stats->n);
 }
 
-
 extern osMutexId_t spi1MutexHandle;
 extern osMutexId_t i2c1MutexHandle;
 
@@ -68,7 +67,7 @@ void StartBarTask(void *argument)
 
 	LPS22HH_PRESS_Enable(&lps22hh);
 	LPS22HH_PRESS_SetOutputDataRate(&lps22hh, 200.0f);
-	LPS22HH_Set_Filter_Mode(&lps22hh, LPS22HH_LPF_ODR_DIV_2);
+	LPS22HH_Set_Filter_Mode(&lps22hh, LPS22HH_LPF_ODR_DIV_9);
 
 	LPS22HH_TEMP_Enable(&lps22hh);
 
@@ -237,7 +236,7 @@ void StartImuTask(void *argument)
 		// ComputeStatisticsRecursive(&stats, 1000, imu_angular_velocity.z);
 
 		// Print biases
-		printf("ID: 0x%02X Acceleration: %.4f %.4f %.4f Gyroscope: %.4f %.4f %.4f\n", id, acc_offset.x, acc_offset.y, acc_offset.z, gyro_offset.x, gyro_offset.y, gyro_offset.z);
+		// printf("ID: 0x%02X Acceleration: %.4f %.4f %.4f Gyroscope: %.4f %.4f %.4f\n", id, acc_offset.x, acc_offset.y, acc_offset.z, gyro_offset.x, gyro_offset.y, gyro_offset.z);
 
 		// printf("ID: 0x%02X Acceleration: %.2f %.2f %.2f Gyroscope: %.4f %.4f %.4f\n", id, imu_acceleration.x, imu_acceleration.y, imu_acceleration.z, imu_angular_velocity.x, imu_angular_velocity.y, imu_angular_velocity.z);
 
@@ -248,6 +247,9 @@ void StartImuTask(void *argument)
 volatile float gps_latitude;
 volatile float gps_longitude;
 volatile float gps_altitude;
+
+volatile Vector2 gps_velocity;
+volatile float gps_orientation_z;
 
 void StartGpsTask(void *argument)
 {
@@ -264,6 +266,8 @@ void StartGpsTask(void *argument)
 	gps.start();
 
 	osDelay(10);
+
+	Vector2 velocity;
 
 	while (true)
 	{
@@ -282,14 +286,22 @@ void StartGpsTask(void *argument)
 			gps_latitude = gps.getLatitude();
 			gps_longitude = gps.getLongitude();
 			gps_altitude = gps.getAltitude();
+
+			velocity = gps.getVelocity();
+			gps_velocity.x = velocity.x;
+			gps_velocity.y = velocity.y;
+			gps_orientation_z = gps.getOrientationZ();
+
+			// printf("Latitude: %.8f Longitude: %.8f Altitude: %.2f\n", gps_latitude, gps_longitude, gps_altitude);
+			printf("Speed (km/h): %.2f, Velocity: %.2f %.2f Orientation: %.5f\n", velocity.magnitude() * 3.6f, gps_velocity.x, gps_velocity.y, gps_orientation_z);
 		}
 		else
 		{
 			HAL_GPIO_WritePin(LED2_STATUS2_PE1_GPIO_Port, LED2_STATUS2_PE1_Pin, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_SET);
-		}
 
-		// printf("Latitude: %.8f Longitude: %.8f Altitude: %.2f\n", gps.getLatitude(), gps.getLongitude(), gps.getAltitude());
+			gps.start(); // Restart the GPS
+		}
 
 		osDelay(100);
 	}

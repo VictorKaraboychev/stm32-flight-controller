@@ -6,6 +6,7 @@
 
 #define VECTOR3_ZERO Vector3(0, 0, 0)
 #define VECTOR3_ONE Vector3(1, 1, 1)
+#define VECTOR3_ROTATION(a, b, c) Vector3(cos(a) * cos(b), sin(a) * cos(b), sin(b))
 
 class Vector3
 {
@@ -44,6 +45,7 @@ public:
 
 #define VECTOR2_ZERO Vector2(0, 0)
 #define VECTOR2_ONE Vector2(1, 1)
+#define VECTOR2_ROTATION(theta) Vector2(cos(theta), sin(theta))
 
 class Vector2
 {

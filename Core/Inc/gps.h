@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "usart.h"
+#include "vector.h"
 
 enum GPS_BAUDRATE
 {
@@ -39,10 +40,14 @@ public:
 
 	void init(UART_HandleTypeDef *huart);
 	void start();
+	void stop();
 
 	float getLatitude();
 	float getLongitude();
 	float getAltitude();
+
+	Vector2 getVelocity();
+	float getOrientationZ();
 
 	bool isFixed();
 
@@ -51,6 +56,8 @@ public:
 
 	void UART_Callback();
 private:
+	bool active = false;
+
 	// NMEA buffer
 	uint8_t rx_byte;
 	uint8_t rx_buffer[256];
@@ -72,11 +79,10 @@ private:
 	int lock;
 	int satelites;
 	float hdop;
-	char msl_units;
 
 	// RMC - Recommended Minimmum Specific GNS Data
 	char rmc_status;
-	float speed_k;
+	float speed_nmi; // Speed nmi/h
 	float course_d;
 	int date;
 
@@ -84,16 +90,12 @@ private:
 	char gll_status;
 
 	// VTG - Course over ground, ground speed
-	float course_t; // ground speed true
-	char course_t_unit;
-	float course_m; // magnetic
-	char course_m_unit;
-	char speed_k_unit;
-	float speed_km; // speek km/hr
-	char speed_km_unit;
+	float course_t; // Ground speed orientation
+	float course_m; // Magnetic orientation
+	float speed_km; // Speed km/hr
 
 	// TXT
-	char antenna_status;
+	bool antenna_status;
 
 	void parse(const uint8_t *nmea);
 };
