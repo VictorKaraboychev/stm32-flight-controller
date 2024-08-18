@@ -105,11 +105,13 @@ USB_DEVICE/Target/usbd_conf.c
 
 
 CPP_SOURCES = \
+Core/Src/control.cpp \
 Core/Src/freertos.cpp \
 Core/Src/gps.cpp \
 Core/Src/kalman.cpp \
 Core/Src/kinematics.cpp \
 Core/Src/main.cpp \
+Core/Src/sensors.cpp \
 Core/Src/utility/matrix.cpp \
 Core/Src/utility/vector.cpp
 

@@ -140,7 +140,7 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *i2cHandle)
 		GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
 		GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
 		GPIO_InitStruct.Pull = GPIO_NOPULL;
-		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+		GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 		GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
 		HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -232,20 +232,32 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef *i2cHandle)
 
 /* USER CODE BEGIN 1 */
 
-HAL_StatusTypeDef I2C_Read_Register(I2C_HandleTypeDef *hi2c, uint16_t devAddr, uint8_t regAddr, uint8_t *pData, uint16_t size)
+HAL_StatusTypeDef I2C_Read_Register(I2C_HandleTypeDef *hi2c, osMutexId_t *mi2c, uint16_t devAddr, uint8_t regAddr, uint8_t *pData, uint16_t size)
 {
+	// Aquire the I2C bus
+	osMutexAcquire(*mi2c, osWaitForever);
+
 	HAL_StatusTypeDef status = HAL_OK;
 
 	status = HAL_I2C_Mem_Read(hi2c, devAddr, regAddr, I2C_MEMADD_SIZE_8BIT, pData, size, HAL_MAX_DELAY);
 
+	// Release the I2C bus
+	osMutexRelease(*mi2c);
+
 	return status;
 }
 
-HAL_StatusTypeDef I2C_Write_Register(I2C_HandleTypeDef *hi2c, uint16_t devAddr, uint8_t regAddr, const uint8_t *pData, uint16_t size)
+HAL_StatusTypeDef I2C_Write_Register(I2C_HandleTypeDef *hi2c, osMutexId_t *mi2c, uint16_t devAddr, uint8_t regAddr, const uint8_t *pData, uint16_t size)
 {
+	// Aquire the I2C bus
+	osMutexAcquire(*mi2c, osWaitForever);
+
 	HAL_StatusTypeDef status = HAL_OK;
 
 	status = HAL_I2C_Mem_Write(hi2c, devAddr, regAddr, I2C_MEMADD_SIZE_8BIT, (uint8_t *)pData, size, HAL_MAX_DELAY);
+
+	// Release the I2C bus
+	osMutexRelease(*mi2c);
 
 	return status;
 }

@@ -27,6 +27,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -45,8 +46,8 @@ void MX_SPI1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
-HAL_StatusTypeDef SPI_Read_Register(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, uint8_t *pData, uint16_t size);
-HAL_StatusTypeDef SPI_Write_Register(SPI_HandleTypeDef *hspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, const uint8_t *pData, uint16_t size);
+HAL_StatusTypeDef SPI_Read_Register(SPI_HandleTypeDef *hspi, osMutexId_t *mspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, uint8_t *pData, uint16_t size);
+HAL_StatusTypeDef SPI_Write_Register(SPI_HandleTypeDef *hspi, osMutexId_t *mspi, GPIO_TypeDef *csPort, uint16_t csPin, uint8_t regAddr, const uint8_t *pData, uint16_t size);
 
 /* USER CODE END Prototypes */
 

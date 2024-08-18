@@ -38,6 +38,7 @@ void Kalman::update(const Vector &u, const Vector &z)
 	Matrix S = this->H * this->P * this->H.transpose() + this->R;
 	Matrix K = this->P * this->H.transpose() * S.inverse();
 
+	// Update the state estimate
 	this->x = this->x + K * (z - this->H * this->x);
 	this->P = (Matrix::identity(this->P.rows()) - K * this->H) * this->P;
 }

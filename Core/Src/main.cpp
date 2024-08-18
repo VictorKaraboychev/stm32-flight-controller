@@ -33,7 +33,6 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include "usbd_cdc_if.h"
-#include "rtos.h"
 
 /* USER CODE END Includes */
 
@@ -62,13 +61,31 @@
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
 static void MPU_Config(void);
-void MX_FREERTOS_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+extern osMutexId_t usbMutexHandle;
+
+int _write(int file, char *ptr, int length)
+{
+	(void)file;
+
+	// Wait for the USB mutex
+	osMutexAcquire(usbMutexHandle, osWaitForever);
+
+	// Transmit the data
+	CDC_Transmit_FS((uint8_t *)ptr, length);
+
+	// Release the USB mutex
+	osMutexRelease(usbMutexHandle);
+
+	return length;
+}
 
 /* USER CODE END 0 */
 
@@ -120,7 +137,12 @@ int main(void)
 	MX_SPI1_Init();
 	/* USER CODE BEGIN 2 */
 
-	MX_USB_DEVICE_Init();
+	// Set all CS pins high
+	HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(BAR_CS_GPIO_Port, BAR_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(MAG_CS_GPIO_Port, MAG_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
 
 	/* USER CODE END 2 */
 
@@ -241,12 +263,6 @@ void PeriphCommonClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-int _write(int file, char *ptr, int len)
-{
-	CDC_Transmit_FS((uint8_t *)ptr, len);
-	return len;
-}
 
 /* USER CODE END 4 */
 

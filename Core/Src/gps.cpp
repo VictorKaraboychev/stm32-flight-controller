@@ -67,6 +67,11 @@ GPS::~GPS()
 void GPS::init(UART_HandleTypeDef *huart)
 {
 	this->huart = huart;
+
+	uint8_t cmdbuf[] = "$PCAS10,0*1C\r\n";
+
+	this->setBaudRate((GPS_BAUDRATE)this->huart->Init.BaudRate);
+	HAL_UART_Transmit(this->huart, cmdbuf, sizeof(cmdbuf), 100);
 }
 
 void GPS::start()
