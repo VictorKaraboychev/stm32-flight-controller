@@ -75,6 +75,9 @@ void StartBarTask(void *argument)
 
 	float pressure, temperature;
 
+	float altitude_offset = 0;
+	bool altitude_calibration = false;
+
 	statistics_t stats;
 
 	while (true)
@@ -85,7 +88,13 @@ void StartBarTask(void *argument)
 		bar_pressure = pressure;
 		bar_temperature = temperature;
 
-		bar_altitude = 44330 * (1 - pow(pressure / 1013.25, 1 / 5.255));
+		bar_altitude = 44330 * (1 - pow(pressure / 1013.25, 1 / 5.255)) + altitude_offset;
+
+		if (!altitude_calibration && gps_reference_altitude != 0)
+		{
+			altitude_offset = gps_reference_altitude - bar_altitude;
+			altitude_calibration = true;
+		}
 
 		// ComputeStatisticsRecursive(&stats, 1000, bar_altitude);
 		// printf("ID: 0x%02X Pressure: %.2f, Altitude: %.2f, Temperature: %.2f, Mean %.3f, STD Deviation: %.5f (95%%), Samples/s: %d\n", id, bar_pressure, bar_altitude, bar_temperature, stats.mean, 2.0f * sqrt(stats.variance), stats.n);
@@ -116,8 +125,16 @@ void StartMagTask(void *argument)
 	lis3mdl.Ctx.write_reg = Write_LIS3MDL;
 	lis3mdl.Ctx.read_reg = Read_LIS3MDL;
 
-	uint8_t id = 0;
+	uint8_t id = 0, rst = 0;
 	LIS3MDL_ReadID(&lis3mdl, &id);
+
+	lis3mdl_reset_set(&lis3mdl.Ctx, PROPERTY_ENABLE);
+
+	do
+	{
+		lis3mdl_reset_get(&lis3mdl.Ctx, &rst);
+	} while (rst);
+
 
 	// LIS3MDL_Init(&lis3mdl);
 
@@ -181,11 +198,13 @@ void StartImuTask(void *argument)
 
 	LSM6DSO_Init(&lsm6dso);
 
+	// Accelerometer configuration
 	LSM6DSO_ACC_SetOutputDataRate_With_Mode(&lsm6dso, 6667.0f, LSM6DSO_ACC_HIGH_PERFORMANCE_MODE);
 	LSM6DSO_ACC_SetFullScale(&lsm6dso, 4);
 	LSM6DSO_ACC_Set_Filter_Mode(&lsm6dso, 0, LSM6DSO_LP_ODR_DIV_10);
 	uint8_t acc_status = LSM6DSO_ACC_Enable(&lsm6dso);
 
+	// Gyroscope configuration
 	LSM6DSO_GYRO_SetOutputDataRate_With_Mode(&lsm6dso, 6667.0f, LSM6DSO_GYRO_HIGH_PERFORMANCE_MODE);
 	LSM6DSO_GYRO_SetFullScale(&lsm6dso, 500);
 	LSM6DSO_GYRO_Set_Filter_Mode(&lsm6dso, 0, LSM6DSO_LP_ODR_DIV_10);
@@ -193,6 +212,7 @@ void StartImuTask(void *argument)
 
 	osDelay(10);
 
+	// Accelerometer and gyroscope scale factors
 	float acc_scale = 9.81f / 1000.0f;
 	float gyro_scale = (3.14159f / 180.0f) / 1000.0f;
 
@@ -248,6 +268,10 @@ volatile float gps_latitude;
 volatile float gps_longitude;
 volatile float gps_altitude;
 
+volatile float gps_reference_latitude = 0;
+volatile float gps_reference_longitude = 0;
+volatile float gps_reference_altitude = 0;
+
 volatile Vector2 gps_velocity;
 volatile float gps_orientation_z;
 
@@ -258,10 +282,7 @@ void StartGpsTask(void *argument)
 	gps.setBaudRate(GPS_BAUDRATE_115200);
 	gps.setOutputRate(GPS_ODR_10HZ);
 
-	bool refrenceSet = false;
-
-	float ref_latitude = 0.0;
-	float ref_longitude = 0.0;
+	bool gps_reference = false;
 
 	gps.start();
 
@@ -276,11 +297,13 @@ void StartGpsTask(void *argument)
 			HAL_GPIO_TogglePin(LED2_STATUS2_PE1_GPIO_Port, LED2_STATUS2_PE1_Pin);
 			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_RESET);
 
-			if (!refrenceSet)
+			if (!gps_reference)
 			{
-				ref_latitude = gps.getLatitude();
-				ref_longitude = gps.getLongitude();
-				refrenceSet = true;
+				gps_reference_latitude = gps.getLatitude();
+				gps_reference_longitude = gps.getLongitude();
+				gps_reference_altitude = gps.getAltitude();
+
+				gps_reference = true;
 			}
 
 			gps_latitude = gps.getLatitude();

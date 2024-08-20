@@ -72,18 +72,18 @@ private:
 	float altitude;
 
 	// GGA - Global Positioning System Fixed Data
-	float nmea_longitude;
-	float nmea_latitude;
-	float utc_time;
-	char ns, ew;
-	int lock;
-	int satelites;
-	float hdop;
+	float nmea_longitude; // Longitude
+	float nmea_latitude; // Latitude
+	float utc_time; // UTC time
+	char ns, ew; // North/South, East/West
+	int lock; // GPS quality indicator
+	int satelites; // Number of satelites
+	float hdop; // Horizontal dilution of precision
 
 	// RMC - Recommended Minimmum Specific GNS Data
-	char rmc_status;
+	char rmc_status; // Status
 	float speed_nmi; // Speed nmi/h
-	float course_d;
+	float course_d; // Course in degrees
 	int date;
 
 	// GLL
@@ -95,7 +95,7 @@ private:
 	float speed_km; // Speed km/hr
 
 	// TXT
-	bool antenna_status;
+	bool antenna_status; // Antenna status
 
 	void parse(const uint8_t *nmea);
 };
