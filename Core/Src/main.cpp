@@ -136,6 +136,7 @@ int main(void)
 	MX_UART5_Init();
 	MX_SPI1_Init();
 	/* USER CODE BEGIN 2 */
+	MX_USB_DEVICE_Init();
 
 	// Set all CS pins high
 	HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_SET);

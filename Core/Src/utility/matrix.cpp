@@ -1,4 +1,4 @@
-#include "utility/matrix.h"
+#include "matrix.h"
 
 // Matrix class implementation
 
@@ -35,6 +35,38 @@ Matrix::Matrix(float **data, uint8_t rows, uint8_t cols)
 		{
 			this->_data[i][j] = data[i][j];
 		}
+	}
+}
+
+Matrix::Matrix(std::initializer_list<std::initializer_list<float>> data)
+{
+	this->_rows = data.size();
+	this->_cols = data.begin()->size();
+
+	// Allocate memory for the 2D array
+	this->_data = new float *[this->_rows];
+	for (uint8_t i = 0; i < this->_rows; ++i)
+	{
+		this->_data[i] = new float[this->_cols];
+	}
+
+	// Initialize the matrix with the provided data
+	uint8_t i = 0;
+	for (const auto &row : data)
+	{
+		if (row.size() != this->_cols)
+		{
+			throw "All rows must have the same number of columns";
+			return;
+		}
+
+		uint8_t j = 0;
+		for (const auto &value : row)
+		{
+			_data[i][j] = value;
+			++j;
+		}
+		++i;
 	}
 }
 
@@ -131,6 +163,35 @@ float &Matrix::operator()(uint8_t row, uint8_t col)
 	}
 
 	return this->_data[row][col];
+}
+
+Matrix& Matrix::operator=(const Matrix &m)
+{
+	if (this->_data != NULL)
+	{
+		for (uint8_t i = 0; i < this->_rows; i++)
+		{
+			delete[] this->_data[i];
+		}
+
+		delete[] this->_data;
+	}
+
+	this->_rows = m._rows;
+	this->_cols = m._cols;
+
+	this->_data = new float *[this->_rows];
+	for (uint8_t i = 0; i < this->_rows; i++)
+	{
+		this->_data[i] = new float[this->_cols];
+
+		for (uint8_t j = 0; j < this->_cols; j++)
+		{
+			this->_data[i][j] = m._data[i][j];
+		}
+	}
+
+	return *this;
 }
 
 Matrix Matrix::operator+(const Matrix &m) const
@@ -497,6 +558,42 @@ float Matrix::determinant() const
 	delete[] data;
 
 	return result;
+}
+
+void Matrix::print() const
+{
+	char buffer[8];
+	char *result = new char[this->_rows * this->_cols * 16];
+
+	strcpy(result, "[");
+
+	for (uint8_t i = 0; i < this->_rows; i++)
+	{
+		strcat(result, "[");
+
+		for (uint8_t j = 0; j < this->_cols; j++)
+		{
+			sprintf(buffer, "%.2f", this->_data[i][j]);
+			strcat(result, buffer);
+
+			if (j < this->_cols - 1)
+			{
+				strcat(result, ", ");
+			}
+		}
+
+		strcat(result, "]");
+
+		if (i < this->_rows - 1)
+		{
+			strcat(result, ", ");
+		}
+	}
+
+	strcat(result, "]");
+
+	printf("%s\n", result);
+	delete[] result;
 }
 
 Matrix Matrix::identity(uint8_t size)

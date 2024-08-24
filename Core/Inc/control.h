@@ -4,6 +4,10 @@
 #include "main.h"
 #include "cmsis_os.h"
 
+#include "vector.h"
+#include "matrix.h"
+#include "extended_kalman_filter.h"
+
 #include "sensors.h"
 
 void StartStatusLedTask(void *argument);

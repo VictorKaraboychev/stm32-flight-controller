@@ -133,12 +133,13 @@ float GPS::getAltitude()
 	return altitude;
 }
 
-Vector2 GPS::getVelocity()
+void GPS::getVelocity(float *x, float *y)
 {
 	float theta = this->getOrientationZ();
 	float speed = this->speed_km / 3.6f;
 
-	return VECTOR2_ROTATION(theta) * speed;
+	*x = speed * cos(theta);
+	*y = speed * sin(theta);
 }
 
 float GPS::getOrientationZ()

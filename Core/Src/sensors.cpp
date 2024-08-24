@@ -5,25 +5,31 @@ typedef struct
 	float mean = 0;
 	float variance = 0;
 	uint64_t n = 0;
-	uint64_t timestamp = 0;
+	uint64_t start_timestamp = 0;
+	uint64_t last_timestamp = 0;
 } statistics_t;
 
 void ComputeStatisticsRecursive(statistics_t *stats, uint32_t period_ms, float value)
 {
-	if (stats->timestamp == 0)
+	if (stats->start_timestamp == 0)
 	{
-		stats->timestamp = HAL_GetTick();
+		stats->start_timestamp = HAL_GetTick();
 	}
 
 	stats->mean = (stats->mean * stats->n + value) / (stats->n + 1);
 	stats->variance = (stats->variance * stats->n + pow(value - stats->mean, 2)) / (stats->n + 1);
 
-	if (HAL_GetTick() - stats->timestamp < period_ms)
+	if (HAL_GetTick() - stats->start_timestamp < period_ms)
 	{
 		stats->n += 1;
 	}
 
-	printf("Mean: %.3f, Variance: %.5f, STD (95%%): %.5f, Samples: %d\n", stats->mean, stats->variance, 2.0f * sqrt(stats->variance), stats->n);
+	// Print statistics once per second
+	if (HAL_GetTick() - stats->last_timestamp >= 1000)
+	{
+		printf("Mean: %.8f, Variance: %.8f, STD (95%%): %.5f, Samples: %d\n", stats->mean, stats->variance, 2.0f * sqrt(stats->variance), stats->n);
+		stats->last_timestamp = HAL_GetTick();
+	}
 }
 
 extern osMutexId_t spi1MutexHandle;
@@ -43,15 +49,17 @@ int32_t Read_LPS22HH(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 	return SPI_Read_Register(&hspi1, &spi1MutexHandle, BAR_CS_GPIO_Port, BAR_CS_Pin, reg, data, len);
 }
 
-volatile float bar_temperature;
-volatile float bar_pressure;
-volatile float bar_altitude;
+BarData bar_data;
 
 void StartBarTask(void *argument)
 {
+	bar_data.active = false;
+
 	lps22hh.Ctx.handle = &hspi1;
 	lps22hh.Ctx.write_reg = Write_LPS22HH;
 	lps22hh.Ctx.read_reg = Read_LPS22HH;
+
+	lps22hh.IO.BusType = LPS22HH_SPI_4WIRES_BUS;
 
 	uint8_t id = 0, rst = 0;
 	LPS22HH_ReadID(&lps22hh, &id);
@@ -77,23 +85,37 @@ void StartBarTask(void *argument)
 
 	float altitude_offset = 0;
 	bool altitude_calibration = false;
+	float status = false;
 
 	statistics_t stats;
 
 	while (true)
 	{
-		LPS22HH_PRESS_GetPressure(&lps22hh, &pressure);
-		LPS22HH_TEMP_GetTemperature(&lps22hh, &temperature);
+		status = (LPS22HH_PRESS_GetPressure(&lps22hh, &pressure) == LPS22HH_OK) && (LPS22HH_TEMP_GetTemperature(&lps22hh, &temperature) == LPS22HH_OK);
 
-		bar_pressure = pressure;
-		bar_temperature = temperature;
-
-		bar_altitude = 44330 * (1 - pow(pressure / 1013.25, 1 / 5.255)) + altitude_offset;
-
-		if (!altitude_calibration && gps_reference_altitude != 0)
+		// Check if the barometer is active
+		if (!status || id != LPS22HH_ID)
 		{
-			altitude_offset = gps_reference_altitude - bar_altitude;
+			bar_data.active = false;
+
+			osDelay(100);
+			continue;
+		}
+
+		bar_data.pressure = pressure;
+		bar_data.temperature = temperature;
+
+		bar_data.altitude = 44330 * (1 - pow(pressure / 1013.25, 1 / 5.255)) + altitude_offset;
+
+		if (!altitude_calibration && gps_data.reference_set)
+		{
+			altitude_offset = gps_data.reference.altitude - bar_data.altitude;
 			altitude_calibration = true;
+		}
+
+		if (altitude_calibration)
+		{
+			bar_data.active = true;
 		}
 
 		// ComputeStatisticsRecursive(&stats, 1000, bar_altitude);
@@ -105,25 +127,31 @@ void StartBarTask(void *argument)
 
 // LIS3MDTR
 
-volatile Vector3 mag_magnetic_field;
+MagData mag_data;
 
 LIS3MDL_Object_t lis3mdl;
 
 int32_t Write_LIS3MDL(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
+	reg |= 0x40; // Set the multi-write bit (0bx1xxxxxx)
 	return SPI_Write_Register(&hspi1, &spi1MutexHandle, MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
 }
 
 int32_t Read_LIS3MDL(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 {
+	reg |= 0x40; // Set the multi-read bit (0bx1xxxxxx)
 	return SPI_Read_Register(&hspi1, &spi1MutexHandle, MAG_CS_GPIO_Port, MAG_CS_Pin, reg, data, len);
 }
 
 void StartMagTask(void *argument)
 {
+	mag_data.active = false;
+
 	lis3mdl.Ctx.handle = &hspi1;
 	lis3mdl.Ctx.write_reg = Write_LIS3MDL;
 	lis3mdl.Ctx.read_reg = Read_LIS3MDL;
+
+	lis3mdl.IO.BusType = LIS3MDL_SPI_4WIRES_BUS;
 
 	uint8_t id = 0, rst = 0;
 	LIS3MDL_ReadID(&lis3mdl, &id);
@@ -135,28 +163,44 @@ void StartMagTask(void *argument)
 		lis3mdl_reset_get(&lis3mdl.Ctx, &rst);
 	} while (rst);
 
+	LIS3MDL_Init(&lis3mdl);
 
-	// LIS3MDL_Init(&lis3mdl);
+	// Magnetometer configuration
+	LIS3MDL_MAG_Enable(&lis3mdl);
 
-	// LIS3MDL_MAG_Enable(&lis3mdl);
-	// LIS3MDL_MAG_SetOutputDataRate(&lis3mdl, 100.0f);
-	// LIS3MDL_MAG_SetFullScale(&lis3mdl, LIS3MDL_4_GAUSS);
+	// Set the data rate to 155 Hz in ultra-high-performance mode
+	lis3mdl_data_rate_set(&lis3mdl.Ctx, LIS3MDL_UHP_155Hz);
 
-	// osDelay(10);
+	// Set the full-scale to 4 Gauss
+	LIS3MDL_MAG_SetFullScale(&lis3mdl, LIS3MDL_4_GAUSS);
 
-	// LIS3MDL_Axes_t mag;
+	osDelay(10);
+
+	LIS3MDL_Axes_t mag;
+	bool status = false;
 
 	while (true)
 	{
-		// LIS3MDL_MAG_GetAxes(&lis3mdl, &mag);
+		Read_LIS3MDL(&lis3mdl, 0x0F, &id, 1);
 
-		// magnetic_field.x = mag.x;
-		// magnetic_field.y = mag.y;
-		// magnetic_field.z = mag.z;
+		status = LIS3MDL_MAG_GetAxes(&lis3mdl, &mag) == LIS3MDL_OK;
 
-		// printf("ID: 0x%02X Magnetic Field: %.2f %.2f %.2f\n", id, mag_magnetic_field.x, mag_magnetic_field.y, mag_magnetic_field.z);
+		// Check if the magnetometer is active
+		if (!status || id != LIS3MDL_ID)
+		{
+			mag_data.active = false;
 
-		osDelay(500);
+			osDelay(100);
+			continue;
+		}
+
+		mag_data.magnetic_field = Vector{(float)mag.x, (float)mag.y, (float)mag.z};
+
+		mag_data.active = true;
+
+		// printf("ID: 0x%02X Magnetic Field: %.2f %.2f %.2f\n", id, *mag_data.magnetic_field.x, *mag_data.magnetic_field.y, *mag_data.magnetic_field.z);
+
+		osDelay(50);
 	}
 }
 
@@ -174,11 +218,12 @@ int32_t Read_LSM6DSO(void *handle, uint8_t reg, uint8_t *data, uint16_t len)
 	return SPI_Read_Register(&hspi1, &spi1MutexHandle, IMU_CS_GPIO_Port, IMU_CS_Pin, reg, data, len);
 }
 
-volatile Vector3 imu_acceleration;
-volatile Vector3 imu_angular_velocity;
+IMUData imu_data;
 
 void StartImuTask(void *argument)
 {
+	imu_data.active = false;
+
 	lsm6dso.Ctx.handle = &hspi1;
 	lsm6dso.Ctx.write_reg = Write_LSM6DSO;
 	lsm6dso.Ctx.read_reg = Read_LSM6DSO;
@@ -202,93 +247,90 @@ void StartImuTask(void *argument)
 	LSM6DSO_ACC_SetOutputDataRate_With_Mode(&lsm6dso, 6667.0f, LSM6DSO_ACC_HIGH_PERFORMANCE_MODE);
 	LSM6DSO_ACC_SetFullScale(&lsm6dso, 4);
 	LSM6DSO_ACC_Set_Filter_Mode(&lsm6dso, 0, LSM6DSO_LP_ODR_DIV_10);
-	uint8_t acc_status = LSM6DSO_ACC_Enable(&lsm6dso);
+	LSM6DSO_ACC_Enable(&lsm6dso);
 
 	// Gyroscope configuration
 	LSM6DSO_GYRO_SetOutputDataRate_With_Mode(&lsm6dso, 6667.0f, LSM6DSO_GYRO_HIGH_PERFORMANCE_MODE);
 	LSM6DSO_GYRO_SetFullScale(&lsm6dso, 500);
 	LSM6DSO_GYRO_Set_Filter_Mode(&lsm6dso, 0, LSM6DSO_LP_ODR_DIV_10);
-	uint8_t gyro_status = LSM6DSO_GYRO_Enable(&lsm6dso);
+	LSM6DSO_GYRO_Enable(&lsm6dso);
 
 	osDelay(10);
 
 	// Accelerometer and gyroscope scale factors
-	float acc_scale = 9.81f / 1000.0f;
-	float gyro_scale = (3.14159f / 180.0f) / 1000.0f;
+	float acc_scale = GRAVITY / 1000.0f;
+	float gyro_scale = (M_PI / 180.0f) / 1000.0f;
 
 	LSM6DSO_Axes_t acc, gyro;
+	bool status = false;
 
 	// Calibrate the IMU
 	uint16_t samples = 1000;
-	Vector3 acc_offset, gyro_offset;
+	Vector acc_bias(3), gyro_bias(3);
 
 	for (uint16_t i = 0; i < samples; i++)
 	{
 		LSM6DSO_ACC_GetAxes(&lsm6dso, &acc);
 		LSM6DSO_GYRO_GetAxes(&lsm6dso, &gyro);
 
-		acc_offset += Vector3(acc.x, acc.y, acc.z);
-		gyro_offset += Vector3(gyro.x, gyro.y, gyro.z);
+		acc_bias += -Vector{(float)acc.x, (float)acc.y, (float)acc.z};
+		gyro_bias += Vector{(float)gyro.x, (float)gyro.y, (float)gyro.z};
 
 		osDelay(2);
 	}
 
-	acc_offset *= (acc_scale / (float)samples);
-	gyro_offset *= (gyro_scale / (float)samples);
+	acc_bias *= (acc_scale / (float)samples);
+	gyro_bias *= (gyro_scale / (float)samples);
 
-	acc_offset.z -= 9.81f; // Subtract gravity from the z-axis
+	*acc_bias.z += GRAVITY; // Subtract gravity from the z-axis
 
 	statistics_t stats;
 
 	while (true)
 	{
-		LSM6DSO_ACC_GetAxes(&lsm6dso, &acc);
-		LSM6DSO_GYRO_GetAxes(&lsm6dso, &gyro);
+		status = (LSM6DSO_ACC_GetAxes(&lsm6dso, &acc) == LSM6DSO_OK) && (LSM6DSO_GYRO_GetAxes(&lsm6dso, &gyro) == LSM6DSO_OK);
 
-		imu_acceleration.x = (acc.x * acc_scale) - acc_offset.x;
-		imu_acceleration.y = (acc.y * acc_scale) - acc_offset.y;
-		imu_acceleration.z = (acc.z * acc_scale) - acc_offset.z;
+		// Check if the IMU is active
+		if (!status || id != LSM6DSO_ID)
+		{
+			imu_data.active = false;
 
-		imu_angular_velocity.x = (gyro.x * gyro_scale) - gyro_offset.x;
-		imu_angular_velocity.y = (gyro.y * gyro_scale) - gyro_offset.y;
-		imu_angular_velocity.z = (gyro.z * gyro_scale) - gyro_offset.z;
+			osDelay(100);
+			continue;
+		}
 
-		// ComputeStatisticsRecursive(&stats, 1000, imu_angular_velocity.z);
+		// Map the IMU data to the IMU data structure
+		imu_data.acceleration = (-Vector{(float)acc.x, (float)acc.y, (float)acc.z} * acc_scale - acc_bias);
+		imu_data.angular_velocity = (Vector{(float)gyro.x, (float)gyro.y, (float)gyro.z} * gyro_scale - gyro_bias);
+
+		imu_data.active = true;
+
+		// ComputeStatisticsRecursive(&stats, 1000, *imu_data.angular_velocity.z);
 
 		// Print biases
-		// printf("ID: 0x%02X Acceleration: %.4f %.4f %.4f Gyroscope: %.4f %.4f %.4f\n", id, acc_offset.x, acc_offset.y, acc_offset.z, gyro_offset.x, gyro_offset.y, gyro_offset.z);
+		// printf("ID: 0x%02X Acceleration: %.4f %.4f %.4f Gyroscope: %.4f %.4f %.4f\n", id, *acc_bias.x, *acc_bias.y, *acc_bias.z, *gyro_bias.x, *gyro_bias.y, *gyro_bias.z);
 
-		// printf("ID: 0x%02X Acceleration: %.2f %.2f %.2f Gyroscope: %.4f %.4f %.4f\n", id, imu_acceleration.x, imu_acceleration.y, imu_acceleration.z, imu_angular_velocity.x, imu_angular_velocity.y, imu_angular_velocity.z);
+		// printf("ID: 0x%02X Acceleration: %.2f %.2f %.2f Gyroscope: %.4f %.4f %.4f\n", id, *imu_data.acceleration.x, *imu_data.acceleration.y, *imu_data.acceleration.z, *imu_data.angular_velocity.x, *imu_data.angular_velocity.y, *imu_data.angular_velocity.z);
 
 		osDelay(2);
 	}
 }
 
-volatile float gps_latitude;
-volatile float gps_longitude;
-volatile float gps_altitude;
-
-volatile float gps_reference_latitude = 0;
-volatile float gps_reference_longitude = 0;
-volatile float gps_reference_altitude = 0;
-
-volatile Vector2 gps_velocity;
-volatile float gps_orientation_z;
+GPSData gps_data;
 
 void StartGpsTask(void *argument)
 {
+	gps_data.reference_set = false;
+	gps_data.active = false;
+
 	gps.init(&huart4);
 
 	gps.setBaudRate(GPS_BAUDRATE_115200);
 	gps.setOutputRate(GPS_ODR_10HZ);
 
-	bool gps_reference = false;
-
 	gps.start();
 
 	osDelay(10);
-
-	Vector2 velocity;
 
 	while (true)
 	{
@@ -297,31 +339,33 @@ void StartGpsTask(void *argument)
 			HAL_GPIO_TogglePin(LED2_STATUS2_PE1_GPIO_Port, LED2_STATUS2_PE1_Pin);
 			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_RESET);
 
-			if (!gps_reference)
+			if (!gps_data.reference_set)
 			{
-				gps_reference_latitude = gps.getLatitude();
-				gps_reference_longitude = gps.getLongitude();
-				gps_reference_altitude = gps.getAltitude();
+				gps_data.reference.latitude = gps.getLatitude();
+				gps_data.reference.longitude = gps.getLongitude();
+				gps_data.reference.altitude = gps.getAltitude();
 
-				gps_reference = true;
+				gps_data.reference_set = true;
 			}
 
-			gps_latitude = gps.getLatitude();
-			gps_longitude = gps.getLongitude();
-			gps_altitude = gps.getAltitude();
+			gps_data.coordinate.latitude = gps.getLatitude();
+			gps_data.coordinate.longitude = gps.getLongitude();
+			gps_data.coordinate.altitude = gps.getAltitude();
 
-			velocity = gps.getVelocity();
-			gps_velocity.x = velocity.x;
-			gps_velocity.y = velocity.y;
-			gps_orientation_z = gps.getOrientationZ();
+			gps.getVelocity(gps_data.velocity.x, gps_data.velocity.y);
+			gps_data.orientation_z = gps.getOrientationZ();
+
+			gps_data.active = true;
 
 			// printf("Latitude: %.8f Longitude: %.8f Altitude: %.2f\n", gps_latitude, gps_longitude, gps_altitude);
-			printf("Speed (km/h): %.2f, Velocity: %.2f %.2f Orientation: %.5f\n", velocity.magnitude() * 3.6f, gps_velocity.x, gps_velocity.y, gps_orientation_z);
+			// printf("Speed (km/h): %.2f, Velocity: %.2f %.2f Orientation: %.5f\n", velocity.magnitude() * 3.6f, gps_velocity.x, gps_velocity.y, gps_orientation_z);
 		}
 		else
 		{
 			HAL_GPIO_WritePin(LED2_STATUS2_PE1_GPIO_Port, LED2_STATUS2_PE1_Pin, GPIO_PIN_RESET);
 			HAL_GPIO_WritePin(LED3_STATUS3_PE2_GPIO_Port, LED3_STATUS3_PE2_Pin, GPIO_PIN_SET);
+
+			gps_data.active = false;
 
 			gps.start(); // Restart the GPS
 		}
@@ -332,24 +376,33 @@ void StartGpsTask(void *argument)
 
 #define TF_LUNA_ADDRESS (0x10 << 1) // Address might be 0x10, shift for STM HAL
 
-volatile float tof_distance;
+TOFData tof_data;
 
 void StartTofTask(void *argument)
 {
+	tof_data.active = false;
+
+	uint8_t data[2] = {0};
+	bool status = false;
+
 	osDelay(10);
 
 	while (true)
 	{
-		uint8_t data[2] = {0};
-		uint8_t status = I2C_Read_Register(&hi2c1, &i2c1MutexHandle, TF_LUNA_ADDRESS, 0x00, data, 2);
+		memset(data, 0, sizeof(data));
+		status = I2C_Read_Register(&hi2c1, &i2c1MutexHandle, TF_LUNA_ADDRESS, 0x00, data, 2) == HAL_OK;
 
-		if (status != HAL_OK)
+		// Check if the TOF sensor is active
+		if (!status)
 		{
+			tof_data.active = false;
+
 			osDelay(100);
 			continue;
 		}
 
-		tof_distance = ((data[1] << 8) | data[0]) / 100.0f;
+		tof_data.distance = ((data[1] << 8) | data[0]) / 100.0f;
+		tof_data.active = true;
 
 		// printf("Distance: %.2f\n", tof_distance);
 		osDelay(50);

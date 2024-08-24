@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "usart.h"
-#include "vector.h"
 
 enum GPS_BAUDRATE
 {
@@ -46,7 +45,7 @@ public:
 	float getLongitude();
 	float getAltitude();
 
-	Vector2 getVelocity();
+	void getVelocity(float *x, float *y);
 	float getOrientationZ();
 
 	bool isFixed();

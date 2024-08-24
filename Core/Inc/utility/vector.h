@@ -3,79 +3,14 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <initializer_list>
+#include <string.h>
+#include <stdio.h>
 
-#define VECTOR3_ZERO Vector3(0, 0, 0)
-#define VECTOR3_ONE Vector3(1, 1, 1)
-#define VECTOR3_ROTATION(a, b, c) Vector3(cos(a) * cos(b), sin(a) * cos(b), sin(b))
-
-class Vector3
-{
-public:
-	Vector3();
-	Vector3(float x, float y, float z);
-	Vector3(const Vector3 &v);
-	~Vector3();
-
-	float x;
-	float y;
-	float z;
-
-	float &operator[](uint8_t index);
-	float operator[](uint8_t index) const;
-
-	Vector3 operator-();
-
-	Vector3 operator+(const Vector3 &v) const;
-	Vector3 operator-(const Vector3 &v) const;
-	Vector3 operator*(const Vector3 &v) const;
-	Vector3 operator*(const float &s) const;
-	Vector3 operator/(const float &s) const;
-
-	void operator+=(const Vector3 &v);
-	void operator-=(const Vector3 &v);
-	void operator*=(const float &s);
-	void operator/=(const float &s);
-
-	float magnitude() const;
-	Vector3 normalize() const;
-
-	float dot(const Vector3 &v);
-	Vector3 cross(const Vector3 &v);
-};
-
-#define VECTOR2_ZERO Vector2(0, 0)
-#define VECTOR2_ONE Vector2(1, 1)
-#define VECTOR2_ROTATION(theta) Vector2(cos(theta), sin(theta))
-
-class Vector2
-{
-public:
-	Vector2();
-	Vector2(float x, float y);
-	Vector2(const Vector2 &v);
-	~Vector2();
-
-	float x;
-	float y;
-
-	float magnitude();
-	Vector2 normalize();
-
-	Vector2 operator+(const Vector2 &v);
-	Vector2 operator-(const Vector2 &v);
-	Vector2 operator*(const float &s);
-	Vector2 operator/(const float &s);
-
-	void operator+=(const Vector2 &v);
-	void operator-=(const Vector2 &v);
-	void operator*=(const float &s);
-	void operator/=(const float &s);
-
-	Vector2 operator*(const Vector2 &v);
-	Vector2 operator-();
-
-	float dot(const Vector2 &v);
-};
+#define VECTOR3_ROTATION(a, b, c) \
+	Vector { cos(a) * cos(b), sin(a) * cos(b), sin(b) }
+#define VECTOR2_ROTATION(theta) \
+	Vector { cos(theta), sin(theta) }
 
 class Vector
 {
@@ -83,14 +18,13 @@ public:
 	Vector();
 	Vector(uint8_t size);
 	Vector(float *data, uint8_t size);
+	Vector(std::initializer_list<float> list);
 	Vector(const Vector &v);
-	Vector(const Vector3 &v);
-	Vector(const Vector2 &v);
 	~Vector();
 
-	// float &x();
-	// float &y();
-	// float &z();
+	float *x;
+	float *y;
+	float *z;
 
 	uint8_t size() const;
 
@@ -103,6 +37,7 @@ public:
 	float &operator()(uint8_t index);
 	float operator()(uint8_t index) const;
 
+	Vector &operator=(const Vector &v);
 	Vector operator-() const;
 
 	Vector operator+(const Vector &v) const;
@@ -123,9 +58,13 @@ public:
 	float dot(const Vector &v) const;
 	Vector cross(const Vector &v) const;
 
+	void print() const;
+
 private:
 	uint8_t _size;
 	float *_data;
+
+	void _updatexyz();
 };
 
 #endif // __VECTOR_H__

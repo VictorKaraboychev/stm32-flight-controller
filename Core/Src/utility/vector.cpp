@@ -1,4 +1,4 @@
-#include "utility/vector.h"
+#include "vector.h"
 
 // Vector class implementation
 
@@ -12,6 +12,8 @@ Vector::Vector(uint8_t size)
 {
 	this->_data = new float[size]{0};
 	this->_size = size;
+
+	this->_updatexyz();
 }
 
 Vector::Vector(float *data, uint8_t size)
@@ -23,6 +25,22 @@ Vector::Vector(float *data, uint8_t size)
 	{
 		this->_data[i] = data[i];
 	}
+
+	this->_updatexyz();
+}
+
+Vector::Vector(std::initializer_list<float> data)
+{
+	this->_size = data.size();
+	this->_data = new float[this->_size];
+
+	uint8_t i = 0;
+	for (const auto &value : data)
+	{
+		this->_data[i++] = value;
+	}
+
+	this->_updatexyz();
 }
 
 Vector::Vector(const Vector &v)
@@ -34,25 +52,8 @@ Vector::Vector(const Vector &v)
 	{
 		this->_data[i] = v._data[i];
 	}
-}
 
-Vector::Vector(const Vector3 &v)
-{
-	this->_data = new float[3];
-	this->_size = 3;
-
-	this->_data[0] = v.x;
-	this->_data[1] = v.y;
-	this->_data[2] = v.z;
-}
-
-Vector::Vector(const Vector2 &v)
-{
-	this->_data = new float[2];
-	this->_size = 2;
-
-	this->_data[0] = v.x;
-	this->_data[1] = v.y;
+	this->_updatexyz();
 }
 
 Vector::~Vector()
@@ -99,6 +100,26 @@ float &Vector::operator()(uint8_t index)
 float Vector::operator()(uint8_t index) const
 {
 	return this->_data[index];
+}
+
+Vector &Vector::operator=(const Vector &v)
+{
+	if (this->_data != NULL)
+	{
+		delete[] this->_data;
+	}
+
+	this->_data = new float[v._size];
+	this->_size = v._size;
+
+	for (uint8_t i = 0; i < this->_size; i++)
+	{
+		this->_data[i] = v._data[i];
+	}
+
+	this->_updatexyz();
+
+	return *this;
 }
 
 Vector Vector::operator-() const
@@ -308,202 +329,46 @@ Vector Vector::cross(const Vector &v) const
 	return result;
 }
 
-// Vector3 class implementation
-
-Vector3::Vector3()
+void Vector::print() const
 {
-	x = 0;
-	y = 0;
-	z = 0;
+	char buffer[16];
+	char *result = new char[this->_size * 32];
+
+	strcpy(result, "[");
+
+	for (uint8_t i = 0; i < this->_size; i++)
+	{
+		sprintf(buffer, "%.4f", this->_data[i]);
+		strcat(result, buffer);
+
+		if (i < this->_size - 1)
+		{
+			strcat(result, ", ");
+		}
+	}
+
+	strcat(result, "]");
+
+	printf("%s\n", result);
+	delete[] result;
 }
 
-Vector3::Vector3(float x, float y, float z)
+void Vector::_updatexyz()
 {
-	this->x = x;
-	this->y = y;
-	this->z = z;
-}
+	uint8_t s = this->_size;
 
-Vector3::Vector3(const Vector3 &v)
-{
-	this->x = v.x;
-	this->y = v.y;
-	this->z = v.z;
-}
+	if (s > 0)
+	{
+		this->x = this->_data + 0;
+	}
 
-Vector3::~Vector3()
-{
-}
+	if (s > 1)
+	{
+		this->y = this->_data + 1;
+	}
 
-Vector3 Vector3::operator-()
-{
-	return Vector3(-x, -y, -z);
-}
-
-Vector3 Vector3::operator+(const Vector3 &v) const
-{
-	return Vector3(x + v.x, y + v.y, z + v.z);
-}
-
-Vector3 Vector3::operator-(const Vector3 &v) const
-{
-	return Vector3(x - v.x, y - v.y, z - v.z);
-}
-
-Vector3 Vector3::operator*(const Vector3 &v) const
-{
-	return Vector3(x * v.x, y * v.y, z * v.z);
-}
-
-Vector3 Vector3::operator*(const float &s) const
-{
-	return Vector3(x * s, y * s, z * s);
-}
-
-Vector3 Vector3::operator/(const float &s) const
-{
-	return Vector3(x / s, y / s, z / s);
-}
-
-void Vector3::operator+=(const Vector3 &v)
-{
-	x += v.x;
-	y += v.y;
-	z += v.z;
-}
-
-void Vector3::operator-=(const Vector3 &v)
-{
-	x -= v.x;
-	y -= v.y;
-	z -= v.z;
-}
-
-void Vector3::operator*=(const float &s)
-{
-	x *= s;
-	y *= s;
-	z *= s;
-}
-
-void Vector3::operator/=(const float &s)
-{
-	x /= s;
-	y /= s;
-	z /= s;
-}
-
-float Vector3::magnitude() const
-{
-	return sqrt(x * x + y * y + z * z);
-}
-
-Vector3 Vector3::normalize() const
-{
-	float mag = magnitude();
-	return Vector3(x / mag, y / mag, z / mag);
-}
-
-Vector3 Vector3::cross(const Vector3 &v)
-{
-	return Vector3(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
-}
-
-float Vector3::dot(const Vector3 &v)
-{
-	return x * v.x + y * v.y + z * v.z;
-}
-
-// Vector2 class implementation
-
-Vector2::Vector2()
-{
-	x = 0;
-	y = 0;
-}
-
-Vector2::Vector2(float x, float y)
-{
-	this->x = x;
-	this->y = y;
-}
-
-Vector2::Vector2(const Vector2 &v)
-{
-	this->x = v.x;
-	this->y = v.y;
-}
-
-Vector2::~Vector2()
-{
-}
-
-float Vector2::magnitude()
-{
-	return sqrt(x * x + y * y);
-}
-
-Vector2 Vector2::normalize()
-{
-	float mag = magnitude();
-	return Vector2(x / mag, y / mag);
-}
-
-Vector2 Vector2::operator+(const Vector2 &v)
-{
-	return Vector2(x + v.x, y + v.y);
-}
-
-Vector2 Vector2::operator-(const Vector2 &v)
-{
-	return Vector2(x - v.x, y - v.y);
-}
-
-Vector2 Vector2::operator*(const float &s)
-{
-	return Vector2(x * s, y * s);
-}
-
-Vector2 Vector2::operator/(const float &s)
-{
-	return Vector2(x / s, y / s);
-}
-
-void Vector2::operator+=(const Vector2 &v)
-{
-	x += v.x;
-	y += v.y;
-}
-
-void Vector2::operator-=(const Vector2 &v)
-{
-	x -= v.x;
-	y -= v.y;
-}
-
-void Vector2::operator*=(const float &s)
-{
-	x *= s;
-	y *= s;
-}
-
-void Vector2::operator/=(const float &s)
-{
-	x /= s;
-	y /= s;
-}
-
-Vector2 Vector2::operator*(const Vector2 &v)
-{
-	return Vector2(x * v.x, y * v.y);
-}
-
-Vector2 Vector2::operator-()
-{
-	return Vector2(-x, -y);
-}
-
-float Vector2::dot(const Vector2 &v)
-{
-	return x * v.x + y * v.y;
+	if (s > 2)
+	{
+		this->z = this->_data + 2;
+	}
 }

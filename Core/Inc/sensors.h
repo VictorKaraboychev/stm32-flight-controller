@@ -13,27 +13,62 @@
 #include "i2c.h"
 
 #include "vector.h"
+#include "coordinate.h"
+
+#define GRAVITY 9.81f
+
+struct IMUData
+{
+	Vector acceleration;
+	Vector angular_velocity;
+
+	bool active;
+};
+
+struct BarData
+{
+	float temperature;
+	float pressure;
+	float altitude;
+
+	bool active;
+};
+
+struct MagData
+{
+	Vector magnetic_field;
+
+	bool active;
+};
+
+struct GPSData
+{
+	Coordinate coordinate;
+	Coordinate reference;
+
+	Vector velocity;
+	float orientation_z;
+	bool reference_set;
+	bool active;
+};
+
+struct TOFData
+{
+	float distance;
+
+	bool active;
+};
+
+extern IMUData imu_data;
+extern BarData bar_data;
+extern MagData mag_data;
+extern GPSData gps_data;
+extern TOFData tof_data;
 
 void StartImuTask(void *argument);
 void StartBarTask(void *argument);
 void StartMagTask(void *argument);
 void StartGpsTask(void *argument);
 void StartTofTask(void *argument);
-
-extern volatile Vector3 imu_acceleration;
-extern volatile Vector3 imu_angular_velocity;
-extern volatile Vector3 mag_magnetic_field;
-
-extern volatile float bar_temperature;
-extern volatile float bar_pressure;
-extern volatile float bar_altitude;
-
-extern volatile float gps_latitude;
-extern volatile float gps_longitude;
-extern volatile float gps_altitude;
-extern volatile Vector2 gps_velocity;
-extern volatile float gps_orientation_z;
-
-extern volatile float tof_distance;
 
 #endif /* __SENSORS_H__ */
